@@ -293,6 +293,66 @@ function resetLadderPlayers() {
   document.getElementById("ladderResultDisplay").innerHTML = "";
 }
 
+// 전체 경로 순차 공개 (물 흐르는 애니메이션)
+function revealAllPaths() {
+  if (!ladderGenerated) {
+    alert("먼저 '사다리 생성' 버튼을 눌러주세요!");
+    return;
+  }
+
+  // 이미 모두 공개된 경우 초기화
+  if (Object.keys(ladderPaths).length === ladderPlayers.length) {
+    ladderPaths = {};
+    nextColorIdx = 0;
+    drawAll();
+    updateLadderResultDisplay();
+    return;
+  }
+
+  // 아직 공개 안 된 참가자 목록
+  const pending = ladderPlayers
+    .map((_, idx) => idx)
+    .filter(idx => !ladderPaths[idx]);
+
+  let i = 0;
+
+  function revealNext() {
+    if (i >= pending.length) return;
+    const playerCol = pending[i++];
+
+    const { points, finalCol } = buildPath(playerCol);
+    const segments = toSegments(points);
+    const totalLen = segments.reduce((s, seg) => s + seg.len, 0);
+    const colorIdx = nextColorIdx++;
+    const color = PATH_COLORS[colorIdx % PATH_COLORS.length];
+
+    if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+
+    let startTime = null;
+
+    function animate(now) {
+      if (!startTime) startTime = now;
+      const drawnLen = Math.min(((now - startTime) / 1000) * FLOW_SPEED, totalLen);
+
+      drawAll({ segments, drawnLen, color });
+
+      if (drawnLen < totalLen) {
+        animationId = requestAnimationFrame(animate);
+      } else {
+        animationId = null;
+        ladderPaths[playerCol] = { points, finalCol, colorIdx, segments };
+        drawAll();
+        updateLadderResultDisplay();
+        revealNext(); // 다음 참가자 순차 공개
+      }
+    }
+
+    requestAnimationFrame(animate);
+  }
+
+  revealNext();
+}
+
 // 경로/사다리 초기화
 function resetLadder() {
   _resetLadderState();
