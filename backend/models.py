@@ -9,4 +9,5 @@ class Task(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     status = Column(String, default="todo")  # todo | in_progress | done
+    due_time = Column(String, nullable=True)  # 예: "09:00"
     created_at = Column(DateTime, server_default=func.now())

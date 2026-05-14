@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List
 import models
 import schemas
@@ -21,6 +21,17 @@ app.add_middleware(
 )
 
 
+@app.on_event("startup")
+def migrate_db():
+    # 기존 DB에 due_time 컬럼이 없을 경우 추가
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN due_time TEXT"))
+            conn.commit()
+        except Exception:
+            pass
+
+
 @app.get("/api/tasks", response_model=List[schemas.TaskResponse])
 def get_tasks(db: Session = Depends(get_db)):
     # 최신 업무 순으로 조회
@@ -30,7 +41,7 @@ def get_tasks(db: Session = Depends(get_db)):
 @app.post("/api/tasks", response_model=schemas.TaskResponse)
 def create_task(task: schemas.TaskCreate, db: Session = Depends(get_db)):
     # 새 업무 생성
-    db_task = models.Task(title=task.title)
+    db_task = models.Task(title=task.title, due_time=task.due_time)
     db.add(db_task)
     db.commit()
     db.refresh(db_task)
@@ -49,6 +60,19 @@ def update_task_status(task_id: int, status_update: schemas.TaskStatusUpdate, db
         raise HTTPException(status_code=404, detail="업무를 찾을 수 없습니다")
 
     task.status = status_update.status
+    db.commit()
+    db.refresh(task)
+    return task
+
+
+@app.patch("/api/tasks/{task_id}/time", response_model=schemas.TaskResponse)
+def update_task_time(task_id: int, time_update: schemas.TaskTimeUpdate, db: Session = Depends(get_db)):
+    # 업무 시간 변경
+    task = db.query(models.Task).filter(models.Task.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="업무를 찾을 수 없습니다")
+
+    task.due_time = time_update.due_time
     db.commit()
     db.refresh(task)
     return task
