@@ -7,6 +7,6 @@
 - 한국어 주석 사용
 - 변수명: snake_case (Python), camelCase (JS)
 - 모든 API는 /api/ 경로 prefix 사용
-## 금지 사항
+## 금지 사항(필독)
 - jQuery 사용 금지
 - CSS 직접 작성 금지 (Tailwind만 사용)
