@@ -1,6 +1,5 @@
 const API_BASE = "http://localhost:8000/api";
 
-// 상태 한글 레이블 및 색상
 const statusConfig = {
   todo: { label: "할 일", color: "bg-gray-100 text-gray-600" },
   in_progress: { label: "진행 중", color: "bg-yellow-100 text-yellow-700" },
@@ -10,17 +9,27 @@ const statusConfig = {
 let currentFilter = "all";
 let allTasks = [];
 
-// 00:00 ~ 23:00 시간 옵션 생성
-function buildTimeOptions(selectedTime = "") {
-  let options = `<option value="">시간 없음</option>`;
-  for (let h = 0; h < 24; h++) {
-    const val = `${String(h).padStart(2, "0")}:00`;
-    options += `<option value="${val}" ${selectedTime === val ? "selected" : ""}>${val}</option>`;
-  }
-  return options;
+// 페이지 전환
+function showPage(pageName) {
+  document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add("hidden"));
+  document.getElementById(`page-${pageName}`).classList.remove("hidden");
+
+  document.querySelectorAll(".menu-item").forEach(el => el.classList.remove("bg-indigo-700"));
+  document.getElementById(`menu-${pageName}`).classList.add("bg-indigo-700");
+
+  if (pageName === "ladder") initLadderGame();
 }
 
-// 추가 폼의 시간 select 초기화
+// 00:00 ~ 23:00 옵션 생성
+function buildTimeOptions(selectedTime = "") {
+  let opts = `<option value="">시간 없음</option>`;
+  for (let h = 0; h < 24; h++) {
+    const val = `${String(h).padStart(2, "0")}:00`;
+    opts += `<option value="${val}" ${selectedTime === val ? "selected" : ""}>${val}</option>`;
+  }
+  return opts;
+}
+
 function initTimeSelect() {
   const sel = document.getElementById("timeSelect");
   sel.innerHTML = `<option value="">시간 선택</option>`;
@@ -30,21 +39,18 @@ function initTimeSelect() {
   }
 }
 
-// 업무 목록 불러오기
 async function fetchTasks() {
   const res = await fetch(`${API_BASE}/tasks`);
   allTasks = await res.json();
   renderTasks();
 }
 
-// 업무 추가
 async function addTask() {
   const input = document.getElementById("taskInput");
   const title = input.value.trim();
   if (!title) return;
 
   const dueTime = document.getElementById("timeSelect").value || null;
-
   await fetch(`${API_BASE}/tasks`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -56,13 +62,11 @@ async function addTask() {
   fetchTasks();
 }
 
-// 업무 삭제
 async function deleteTask(taskId) {
   await fetch(`${API_BASE}/tasks/${taskId}`, { method: "DELETE" });
   fetchTasks();
 }
 
-// 업무 상태 변경
 async function updateStatus(taskId, newStatus) {
   await fetch(`${API_BASE}/tasks/${taskId}/status`, {
     method: "PATCH",
@@ -72,7 +76,6 @@ async function updateStatus(taskId, newStatus) {
   fetchTasks();
 }
 
-// 업무 시간 변경
 async function updateTime(taskId, newTime) {
   await fetch(`${API_BASE}/tasks/${taskId}/time`, {
     method: "PATCH",
@@ -82,7 +85,6 @@ async function updateTime(taskId, newTime) {
   fetchTasks();
 }
 
-// 업무 목록 렌더링
 function renderTasks() {
   const taskList = document.getElementById("taskList");
   const emptyMsg = document.getElementById("emptyMsg");
@@ -107,38 +109,29 @@ function renderTasks() {
         <span class="text-gray-800 truncate">${escapeHtml(task.title)}</span>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <select
-          class="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          onchange="updateTime(${task.id}, this.value)"
-        >
+        <select class="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          onchange="updateTime(${task.id}, this.value)">
           ${buildTimeOptions(task.due_time || "")}
         </select>
-        <select
-          class="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          onchange="updateStatus(${task.id}, this.value)"
-        >
+        <select class="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+          onchange="updateStatus(${task.id}, this.value)">
           <option value="todo" ${task.status === "todo" ? "selected" : ""}>할 일</option>
           <option value="in_progress" ${task.status === "in_progress" ? "selected" : ""}>진행 중</option>
           <option value="done" ${task.status === "done" ? "selected" : ""}>완료</option>
         </select>
-        <button
-          onclick="deleteTask(${task.id})"
-          class="text-red-400 hover:text-red-600 font-bold text-lg leading-none transition"
-          title="삭제"
-        >×</button>
+        <button onclick="deleteTask(${task.id})"
+          class="text-red-400 hover:text-red-600 font-bold text-lg leading-none transition" title="삭제">×</button>
       </div>
     </div>
   `).join("");
 }
 
-// XSS 방지용 이스케이프
 function escapeHtml(text) {
   const div = document.createElement("div");
   div.appendChild(document.createTextNode(text));
   return div.innerHTML;
 }
 
-// 필터 탭 이벤트
 document.querySelectorAll(".filter-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     currentFilter = btn.dataset.filter;
@@ -150,10 +143,7 @@ document.querySelectorAll(".filter-btn").forEach(btn => {
   });
 });
 
-// 추가 버튼 이벤트
 document.getElementById("addBtn").addEventListener("click", addTask);
-
-// 엔터키로 추가
 document.getElementById("taskInput").addEventListener("keydown", e => {
   if (e.key === "Enter") addTask();
 });
@@ -161,5 +151,6 @@ document.getElementById("taskInput").addEventListener("keydown", e => {
 // 초기화
 initTimeSelect();
 fetchTasks();
+showPage("tasks");
 document.querySelector('[data-filter="all"]').className =
   "filter-btn px-4 py-1.5 rounded-full text-sm font-medium bg-indigo-600 text-white";
