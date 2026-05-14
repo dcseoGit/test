@@ -19,6 +19,7 @@ function showPage(pageName) {
 
   if (pageName === "ladder")   initLadderGame();
   if (pageName === "roulette") initRouletteGame();
+  if (pageName === "archery")  initArcheryGame();
 }
 
 // 00:00 ~ 23:00 옵션 생성
