@@ -3,6 +3,7 @@ const LADDER_ROWS = 8;
 const ROW_HEIGHT = 48;
 const TOP_PAD = 15;
 const PATH_COLORS = ["#3b82f6", "#ef4444", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
+const MEDALS = ["🥇", "🥈", "🥉"];
 const FLOW_SPEED = 80; // px/초 - 물 흐르는 속도
 
 const ANIMAL_NAMES = [
@@ -14,7 +15,6 @@ const ANIMAL_NAMES = [
   "🦜 앵무새", "🦩 홍학", "🦚 공작", "🐺 늑대", "🦝 너구리",
 ];
 
-// 중복 없는 랜덤 동물 이름 뽑기
 function pickAnimalNames(count) {
   const shuffled = [...ANIMAL_NAMES].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
@@ -29,14 +29,13 @@ let ladderGenerated = false;
 let ladderReady = false;
 let animationId = null;
 
-function colSpacing() {
-  return Math.max(100, Math.floor(400 / ladderPlayers.length));
-}
-function colX(col) { return colSpacing() / 2 + col * colSpacing(); }
-function rowY(row)  { return TOP_PAD + row * ROW_HEIGHT; }
-function canvasW()  { return ladderPlayers.length * colSpacing(); }
-function canvasH()  { return TOP_PAD + LADDER_ROWS * ROW_HEIGHT + TOP_PAD; }
-function getCanvas() { return document.getElementById("ladderCanvas"); }
+function colSpacing() { return Math.max(100, Math.floor(400 / ladderPlayers.length)); }
+function colX(col)    { return colSpacing() / 2 + col * colSpacing(); }
+function rowY(row)    { return TOP_PAD + row * ROW_HEIGHT; }
+function canvasW()    { return ladderPlayers.length * colSpacing(); }
+function canvasH()    { return TOP_PAD + LADDER_ROWS * ROW_HEIGHT + TOP_PAD; }
+function getCanvas()  { return document.getElementById("ladderCanvas"); }
+function getMedal(idx){ return MEDALS[idx] ?? `${idx + 1}위`; }
 
 // 사다리 무작위 생성
 function generateLadder() {
@@ -81,7 +80,6 @@ function buildPath(startCol) {
   return { points, finalCol: col };
 }
 
-// 포인트 → 세그먼트 변환
 function toSegments(points) {
   return points.slice(1).map((p, i) => {
     const dx = p.x - points[i].x;
@@ -92,12 +90,8 @@ function toSegments(points) {
 
 // 경로 공개 (물 흐르는 애니메이션)
 function revealLadderPath(playerCol) {
-  if (!ladderGenerated) {
-    alert("먼저 '사다리 생성' 버튼을 눌러주세요!");
-    return;
-  }
+  if (!ladderGenerated) { alert("먼저 '사다리 생성' 버튼을 눌러주세요!"); return; }
 
-  // 이미 공개된 경우 토글 취소
   if (ladderPaths[playerCol]) {
     delete ladderPaths[playerCol];
     drawAll();
@@ -114,25 +108,117 @@ function revealLadderPath(playerCol) {
   if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
 
   let startTime = null;
-
   function animate(now) {
     if (!startTime) startTime = now;
     const drawnLen = Math.min(((now - startTime) / 1000) * FLOW_SPEED, totalLen);
-
     drawAll({ segments, drawnLen, color });
 
     if (drawnLen < totalLen) {
       animationId = requestAnimationFrame(animate);
     } else {
       animationId = null;
-      // 완료 → 경로 저장 후 결과 표시
       ladderPaths[playerCol] = { points, finalCol, colorIdx, segments };
       drawAll();
       updateLadderResultDisplay();
+      // 결과 발표 연출
+      showResultAnnouncement(
+        ladderPlayers[playerCol] || `참가자 ${playerCol + 1}`,
+        ladderResults[finalCol]  || `결과 ${finalCol + 1}`,
+        color, getMedal(finalCol)
+      );
     }
   }
-
   requestAnimationFrame(animate);
+}
+
+// 전체 경로 순차 공개
+function revealAllPaths() {
+  if (!ladderGenerated) { alert("먼저 '사다리 생성' 버튼을 눌러주세요!"); return; }
+
+  if (Object.keys(ladderPaths).length === ladderPlayers.length) {
+    ladderPaths = {};
+    nextColorIdx = 0;
+    drawAll();
+    updateLadderResultDisplay();
+    return;
+  }
+
+  const pending = ladderPlayers.map((_, idx) => idx).filter(idx => !ladderPaths[idx]);
+  let i = 0;
+
+  function revealNext() {
+    if (i >= pending.length) return;
+    const playerCol = pending[i++];
+
+    const { points, finalCol } = buildPath(playerCol);
+    const segments = toSegments(points);
+    const totalLen = segments.reduce((s, seg) => s + seg.len, 0);
+    const colorIdx = nextColorIdx++;
+    const color = PATH_COLORS[colorIdx % PATH_COLORS.length];
+
+    if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
+
+    let startTime = null;
+    function animate(now) {
+      if (!startTime) startTime = now;
+      const drawnLen = Math.min(((now - startTime) / 1000) * FLOW_SPEED, totalLen);
+      drawAll({ segments, drawnLen, color });
+
+      if (drawnLen < totalLen) {
+        animationId = requestAnimationFrame(animate);
+      } else {
+        animationId = null;
+        ladderPaths[playerCol] = { points, finalCol, colorIdx, segments };
+        drawAll();
+        updateLadderResultDisplay();
+        // 결과 발표 연출 후 다음 참가자 공개
+        showResultAnnouncement(
+          ladderPlayers[playerCol] || `참가자 ${playerCol + 1}`,
+          ladderResults[finalCol]  || `결과 ${finalCol + 1}`,
+          color, getMedal(finalCol)
+        );
+        setTimeout(revealNext, 2400);
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  revealNext();
+}
+
+// 결과 발표 팝업 연출
+function showResultAnnouncement(pName, rName, color, medal) {
+  const el = document.createElement("div");
+  Object.assign(el.style, {
+    position: "fixed", top: "50%", left: "50%",
+    transform: "translate(-50%, -50%) scale(0.6)",
+    zIndex: "200", opacity: "0", pointerEvents: "none",
+    transition: "opacity 0.25s ease, transform 0.25s ease",
+  });
+
+  el.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-2xl px-10 py-7 text-center"
+      style="border: 4px solid ${color}; min-width:200px">
+      <div style="font-size:3rem;line-height:1">${medal}</div>
+      <div class="mt-3 text-lg font-bold text-gray-800">${escapeHtml(pName)}</div>
+      <div class="text-gray-300 text-sm my-1">▼</div>
+      <div class="text-xl font-bold" style="color:${color}">${escapeHtml(rName)}</div>
+    </div>`;
+
+  document.body.appendChild(el);
+
+  // 팝인
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    el.style.opacity = "1";
+    el.style.transform = "translate(-50%, -50%) scale(1)";
+  }));
+
+  // 페이드아웃 후 제거
+  setTimeout(() => {
+    el.style.opacity = "0";
+    el.style.transform = "translate(-50%, -50%) scale(0.6)";
+    setTimeout(() => el.remove(), 300);
+  }, 2000);
 }
 
 // 전체 캔버스 그리기
@@ -142,10 +228,7 @@ function drawAll(partialPath = null) {
   const ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 세로줄
-  ctx.strokeStyle = "#94a3b8";
-  ctx.lineWidth = 3;
-  ctx.lineCap = "round";
+  ctx.strokeStyle = "#94a3b8"; ctx.lineWidth = 3; ctx.lineCap = "round";
   for (let col = 0; col < ladderPlayers.length; col++) {
     ctx.beginPath();
     ctx.moveTo(colX(col), rowY(0));
@@ -153,9 +236,7 @@ function drawAll(partialPath = null) {
     ctx.stroke();
   }
 
-  // 가로줄
-  ctx.strokeStyle = "#64748b";
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = "#64748b"; ctx.lineWidth = 3;
   for (const bar of ladderBars) {
     const y = rowY(bar.row) + ROW_HEIGHT / 2;
     ctx.beginPath();
@@ -164,95 +245,82 @@ function drawAll(partialPath = null) {
     ctx.stroke();
   }
 
-  // 완료된 경로들
-  for (const { points, colorIdx } of Object.values(ladderPaths)) {
+  for (const { points, colorIdx } of Object.values(ladderPaths))
     drawCompletedPath(ctx, points, PATH_COLORS[colorIdx % PATH_COLORS.length]);
-  }
 
-  // 애니메이션 중인 경로
-  if (partialPath) {
+  if (partialPath)
     drawFlowingPath(ctx, partialPath.segments, partialPath.drawnLen, partialPath.color);
-  }
 }
 
 function drawCompletedPath(ctx, points, color) {
-  ctx.strokeStyle = color + "cc"; // 약간 투명
-  ctx.lineWidth = 5;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
+  ctx.strokeStyle = color + "cc";
+  ctx.lineWidth = 5; ctx.lineJoin = "round"; ctx.lineCap = "round";
   ctx.beginPath();
   points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
   ctx.stroke();
-
-  // 시작·끝 원
   ctx.fillStyle = color;
   [points[0], points[points.length - 1]].forEach(p => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.fill();
   });
 }
 
-// 물 흐르는 애니메이션 경로
 function drawFlowingPath(ctx, segments, drawnLen, color) {
   let remaining = drawnLen;
-  let headX = segments[0].from.x;
-  let headY = segments[0].from.y;
+  let headX = segments[0].from.x, headY = segments[0].from.y;
 
   ctx.strokeStyle = color + "cc";
-  ctx.lineWidth = 5;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
+  ctx.lineWidth = 5; ctx.lineJoin = "round"; ctx.lineCap = "round";
   ctx.beginPath();
   ctx.moveTo(segments[0].from.x, segments[0].from.y);
 
   for (const seg of segments) {
     if (remaining <= 0) break;
     const t = Math.min(remaining / seg.len, 1);
-    const ex = seg.from.x + (seg.to.x - seg.from.x) * t;
-    const ey = seg.from.y + (seg.to.y - seg.from.y) * t;
-    ctx.lineTo(ex, ey);
-    headX = ex;
-    headY = ey;
+    headX = seg.from.x + (seg.to.x - seg.from.x) * t;
+    headY = seg.from.y + (seg.to.y - seg.from.y) * t;
+    ctx.lineTo(headX, headY);
     remaining -= seg.len;
   }
   ctx.stroke();
 
-  // 물방울 글로우 (외부)
   ctx.save();
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 20;
+  ctx.shadowColor = color; ctx.shadowBlur = 20;
   ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(headX, headY, 8, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(headX, headY, 8, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 
-  // 물방울 내부 흰 점
   ctx.fillStyle = "rgba(255,255,255,0.85)";
-  ctx.beginPath();
-  ctx.arc(headX, headY, 3.5, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.beginPath(); ctx.arc(headX, headY, 3.5, 0, Math.PI * 2); ctx.fill();
 }
 
-// 결과 배지 업데이트
+// 결과 카드 업데이트 (순위 정렬 + 카드 디자인)
 function updateLadderResultDisplay() {
   const display = document.getElementById("ladderResultDisplay");
-  const entries = Object.entries(ladderPaths)
-    .sort((a, b) => a[1].colorIdx - b[1].colorIdx);
+  const entries = Object.entries(ladderPaths);
 
   if (entries.length === 0) { display.innerHTML = ""; return; }
 
+  // 결과 위치(finalCol) 기준 정렬 → 순위순 표시
+  entries.sort((a, b) => a[1].finalCol - b[1].finalCol);
+
   display.innerHTML =
-    `<div class="flex flex-wrap gap-2 justify-center">` +
+    `<div class="grid gap-3" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));width:100%">` +
     entries.map(([col, { finalCol, colorIdx }]) => {
       const color = PATH_COLORS[colorIdx % PATH_COLORS.length];
-      const pName = ladderPlayers[parseInt(col)]  || `참가자 ${parseInt(col) + 1}`;
-      const rName = ladderResults[finalCol] || `결과 ${finalCol + 1}`;
-      return `<span class="inline-flex items-center gap-1 px-4 py-1.5 rounded-full text-sm font-semibold text-white"
-        style="background:${color}">
-        ${escapeHtml(pName)} → ${escapeHtml(rName)}
-      </span>`;
+      const pName = ladderPlayers[parseInt(col)] || `참가자 ${parseInt(col) + 1}`;
+      const rName = ladderResults[finalCol]       || `결과 ${finalCol + 1}`;
+      const medal = getMedal(finalCol);
+      return `
+        <div class="bg-white rounded-xl shadow-md overflow-hidden flex items-stretch">
+          <div class="w-1.5 shrink-0" style="background:${color}"></div>
+          <div class="flex items-center gap-3 px-4 py-3 flex-1 min-w-0">
+            <span class="text-2xl shrink-0">${medal}</span>
+            <div class="min-w-0">
+              <div class="font-bold text-gray-800 text-sm truncate">${escapeHtml(pName)}</div>
+              <div class="text-xs font-semibold mt-0.5 truncate" style="color:${color}">${escapeHtml(rName)}</div>
+            </div>
+          </div>
+        </div>`;
     }).join("") +
     `</div>`;
 }
@@ -268,7 +336,6 @@ function addLadderPlayer() {
   ladderPlayers.push(newName);
   ladderResults.push(`결과 ${n}`);
 
-  // 캔버스를 참가자 수에 맞게 먼저 리사이즈
   const canvas = getCanvas();
   canvas.width = canvasW();
   canvas.height = canvasH();
@@ -293,66 +360,6 @@ function resetLadderPlayers() {
   document.getElementById("ladderResultDisplay").innerHTML = "";
 }
 
-// 전체 경로 순차 공개 (물 흐르는 애니메이션)
-function revealAllPaths() {
-  if (!ladderGenerated) {
-    alert("먼저 '사다리 생성' 버튼을 눌러주세요!");
-    return;
-  }
-
-  // 이미 모두 공개된 경우 초기화
-  if (Object.keys(ladderPaths).length === ladderPlayers.length) {
-    ladderPaths = {};
-    nextColorIdx = 0;
-    drawAll();
-    updateLadderResultDisplay();
-    return;
-  }
-
-  // 아직 공개 안 된 참가자 목록
-  const pending = ladderPlayers
-    .map((_, idx) => idx)
-    .filter(idx => !ladderPaths[idx]);
-
-  let i = 0;
-
-  function revealNext() {
-    if (i >= pending.length) return;
-    const playerCol = pending[i++];
-
-    const { points, finalCol } = buildPath(playerCol);
-    const segments = toSegments(points);
-    const totalLen = segments.reduce((s, seg) => s + seg.len, 0);
-    const colorIdx = nextColorIdx++;
-    const color = PATH_COLORS[colorIdx % PATH_COLORS.length];
-
-    if (animationId) { cancelAnimationFrame(animationId); animationId = null; }
-
-    let startTime = null;
-
-    function animate(now) {
-      if (!startTime) startTime = now;
-      const drawnLen = Math.min(((now - startTime) / 1000) * FLOW_SPEED, totalLen);
-
-      drawAll({ segments, drawnLen, color });
-
-      if (drawnLen < totalLen) {
-        animationId = requestAnimationFrame(animate);
-      } else {
-        animationId = null;
-        ladderPaths[playerCol] = { points, finalCol, colorIdx, segments };
-        drawAll();
-        updateLadderResultDisplay();
-        revealNext(); // 다음 참가자 순차 공개
-      }
-    }
-
-    requestAnimationFrame(animate);
-  }
-
-  revealNext();
-}
-
 // 경로/사다리 초기화
 function resetLadder() {
   _resetLadderState();
@@ -368,7 +375,7 @@ function _resetLadderState() {
   ladderGenerated = false;
 }
 
-// 입력 행 렌더링
+// 입력 행 렌더링 (결과 입력에 순위 레이블 추가)
 function renderLadderInputs() {
   const spacing = colSpacing();
   const totalW = canvasW();
@@ -388,10 +395,11 @@ function renderLadderInputs() {
   const resultRow = document.getElementById("ladderResultRow");
   resultRow.style.width = totalW + "px";
   resultRow.innerHTML = ladderResults.map((name, idx) => `
-    <div style="width:${spacing}px" class="flex justify-center">
+    <div style="width:${spacing}px" class="flex flex-col items-center gap-0.5">
+      <span class="text-base leading-none">${getMedal(idx)}</span>
       <input type="text" value="${attrEscape(name)}"
         oninput="ladderResults[${idx}] = this.value"
-        class="w-20 text-center text-xs border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+        class="w-20 text-center text-xs border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 font-medium" />
     </div>`).join("");
 }
 
