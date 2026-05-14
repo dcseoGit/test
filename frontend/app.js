@@ -17,7 +17,8 @@ function showPage(pageName) {
   document.querySelectorAll(".menu-item").forEach(el => el.classList.remove("bg-indigo-700"));
   document.getElementById(`menu-${pageName}`).classList.add("bg-indigo-700");
 
-  if (pageName === "ladder") initLadderGame();
+  if (pageName === "ladder")   initLadderGame();
+  if (pageName === "roulette") initRouletteGame();
 }
 
 // 00:00 ~ 23:00 옵션 생성

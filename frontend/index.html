@@ -21,6 +21,10 @@
         class="menu-item w-full text-left px-5 py-3 flex items-center gap-3 hover:bg-indigo-700 transition text-sm font-medium">
         🪜 사다리게임
       </button>
+      <button onclick="showPage('roulette')" id="menu-roulette"
+        class="menu-item w-full text-left px-5 py-3 flex items-center gap-3 hover:bg-indigo-700 transition text-sm font-medium">
+        🎰 룰렛
+      </button>
     </nav>
   </aside>
 
@@ -106,9 +110,50 @@
       </div>
     </div>
 
+    <!-- 룰렛 페이지 -->
+    <div id="page-roulette" class="hidden py-10 px-6">
+      <h1 class="text-3xl font-bold text-indigo-700 mb-8 text-center">🎰 룰렛</h1>
+
+      <div class="flex flex-col lg:flex-row gap-8 items-center lg:items-start justify-center">
+
+        <!-- 룰렛 휠 + 버튼 -->
+        <div class="flex flex-col items-center gap-4">
+          <canvas id="rouletteCanvas" width="360" height="360" class="block"></canvas>
+          <button onclick="spinRoulette()"
+            class="bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold px-12 py-3 rounded-full text-lg transition-all shadow-lg">
+            🎰 돌리기
+          </button>
+          <div id="rouletteResult" class="w-72"></div>
+        </div>
+
+        <!-- 항목 관리 -->
+        <div class="w-72 flex flex-col gap-3">
+          <h2 class="font-bold text-gray-600 text-sm uppercase tracking-wide">항목 관리</h2>
+          <div class="flex flex-col gap-2">
+            <div class="flex gap-2">
+              <button id="rouletteIconBtn" onclick="toggleIconPicker()"
+                class="border border-gray-300 rounded-lg px-3 py-2 text-xl hover:bg-gray-50 transition shrink-0">🎯</button>
+              <input id="rouletteInput" type="text" placeholder="항목 이름 입력"
+                class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+              <button onclick="addRouletteItem()"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2 rounded-lg transition text-sm shrink-0">
+                추가
+              </button>
+            </div>
+            <!-- 아이콘 선택 패널 -->
+            <div id="rouletteIconPicker"
+              class="hidden flex flex-wrap gap-1 bg-white border border-gray-200 rounded-lg p-2 shadow-md"></div>
+          </div>
+          <div id="rouletteList" class="flex flex-col gap-2 max-h-96 overflow-y-auto pr-1"></div>
+        </div>
+
+      </div>
+    </div>
+
   </main>
 
   <script src="app.js"></script>
   <script src="ladder.js"></script>
+  <script src="roulette.js"></script>
 </body>
 </html>
