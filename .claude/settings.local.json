@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(Get-ChildItem -Path \"D:\\\\taskflow\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(git --version)",
+      "PowerShell(New-Item *)"
+    ]
+  }
+}
